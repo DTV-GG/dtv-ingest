@@ -1,7 +1,7 @@
 //! Under Proton the game's address space is the Windows program's, read through
 //! `/proc/<pid>/mem`. With Yama's default `ptrace_scope` only the game's ancestors (the
 //! launch wrapper) or a process with `CAP_SYS_PTRACE` may open it; otherwise the
-//! `deadlock-api-ingest-memgrant` helper, installed with that capability, opens it for us.
+//! `dtv-ingest-memgrant` helper, installed with that capability, opens it for us.
 
 use core::mem::MaybeUninit;
 use core::time::Duration;
@@ -20,7 +20,7 @@ use rustix::net::{RecvAncillaryBuffer, RecvAncillaryMessage, RecvFlags, recvmsg}
 use super::{MAX_REGION, Region};
 
 /// Where `install-linux.sh` puts the helper, root-owned.
-const HELPER: &str = "/usr/local/libexec/deadlock-api-ingest/deadlock-api-ingest-memgrant";
+const HELPER: &str = "/usr/local/libexec/dtv-ingest/dtv-ingest-memgrant";
 const HELPER_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub(super) struct GameProcess {

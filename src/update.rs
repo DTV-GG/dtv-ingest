@@ -10,18 +10,17 @@ use tracing::info;
 use crate::paths;
 use crate::utils::http_client;
 
-const LATEST_RELEASE: &str =
-    "https://api.github.com/repos/deadlock-api/deadlock-api-ingest/releases/latest";
-const USER_AGENT: &str = "deadlock-api-ingest";
+const LATEST_RELEASE: &str = "https://api.github.com/repos/DTV-GG/dtv-ingest/releases/latest";
+const USER_AGENT: &str = "dtv-ingest";
 const MAX_DOWNLOAD_BYTES: u64 = 256 * 1024 * 1024;
 /// The shared client's 30 s limit is for API calls; a ~30 MB download needs longer.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_mins(10);
 
 /// The release asset that replaces this build.
 #[cfg(windows)]
-const ASSET_NAME: &str = "deadlock-api-ingest-setup.exe";
+const ASSET_NAME: &str = "dtv-ingest-setup.exe";
 #[cfg(target_os = "linux")]
-const ASSET_NAME: &str = "deadlock-api-ingest-ubuntu-latest";
+const ASSET_NAME: &str = "dtv-ingest-ubuntu-latest";
 #[cfg(not(any(windows, target_os = "linux")))]
 const ASSET_NAME: &str = "";
 

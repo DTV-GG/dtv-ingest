@@ -159,8 +159,8 @@ pub(crate) mod linux {
     pub(super) fn unit_file(exe: &Path) -> String {
         format!(
             "[Unit]
-Description=Deadlock API Ingest - Monitors Steam cache for match replays
-Documentation=https://github.com/deadlock-api/deadlock-api-ingest
+Description=DTV Ingest - Monitors Steam cache for match replays
+Documentation=https://github.com/DTV-GG/dtv-ingest
 
 [Service]
 Type=simple
@@ -240,8 +240,8 @@ mod tests {
 
     #[test]
     fn test_unit_file_points_at_exe() {
-        let unit = platform::unit_file(Path::new("/opt/deadlock-api-ingest"));
-        assert!(unit.contains("\nExecStart=/opt/deadlock-api-ingest\n"));
+        let unit = platform::unit_file(Path::new("/opt/dtv-ingest"));
+        assert!(unit.contains("\nExecStart=/opt/dtv-ingest\n"));
         assert!(unit.contains("\nWantedBy=default.target\n"));
     }
 }

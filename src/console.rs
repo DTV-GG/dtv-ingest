@@ -34,7 +34,7 @@ pub(crate) fn message_box(text: &str, is_error: bool) {
 
     let wide = |s: &str| s.encode_utf16().chain([0]).collect::<Vec<u16>>();
     let text = wide(text);
-    let caption = wide("Deadlock API Ingest");
+    let caption = wide("DTV Ingest");
     let icon = if is_error {
         MB_ICONERROR
     } else {

@@ -1,4 +1,4 @@
-//! Telling Deadlock's process apart; shared with the `deadlock-api-ingest-memgrant` helper.
+//! Telling Deadlock's process apart; shared with the `dtv-ingest-memgrant` helper.
 
 const GAME_PROCESS_NAMES: &[&str] = &["project8.exe", "deadlock.exe", "project8"];
 

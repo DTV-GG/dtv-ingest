@@ -1,13 +1,13 @@
 #!/bin/bash
 
-# Deadlock API Ingest - Linux Installation Script
-# This script downloads and installs the deadlock-api-ingest application as a systemd user service
+# DTV Ingest - Linux Installation Script
+# This script downloads and installs the dtv-ingest application as a systemd user service
 
 set -euo pipefail
 
 # --- Configuration ---
-APP_NAME="deadlock-api-ingest"
-GITHUB_REPO="deadlock-api/deadlock-api-ingest"
+APP_NAME="dtv-ingest"
+GITHUB_REPO="DTV-GG/dtv-ingest"
 ASSET_KEYWORD="ubuntu-latest" # Keyword to find in the release asset filename
 
 # Installation paths (User-level, no root required)
@@ -189,7 +189,7 @@ install_icon() {
 create_desktop_shortcut() {
     local executable_path="$1"
     local arguments="${2:-}"
-    local shortcut_name="${3:-Deadlock API Ingest}"
+    local shortcut_name="${3:-DTV Ingest}"
     local comment="${4:-Monitors Steam cache for Deadlock match replays}"
     local file_name="${5:-}"
 
@@ -270,8 +270,8 @@ manage_service() {
 
             cat > "$SYSTEMD_SERVICE_FILE" << EOF
 [Unit]
-Description=Deadlock API Ingest - Monitors Steam cache for match replays
-Documentation=https://github.com/deadlock-api/deadlock-api-ingest
+Description=DTV Ingest - Monitors Steam cache for match replays
+Documentation=https://github.com/DTV-GG/dtv-ingest
 
 [Service]
 Type=simple
@@ -417,7 +417,7 @@ prompt_for_autostart() {
 
 # --- Main Installation Logic ---
 main() {
-    log "INFO" "Starting Deadlock API Ingest installation..."
+    log "INFO" "Starting DTV Ingest installation..."
     log "INFO" "Log file is available at: $LOG_FILE"
 
     check_dependencies
@@ -469,7 +469,7 @@ main() {
     # Download uninstall script
     log "INFO" "Downloading uninstall script..."
     local uninstall_script_path="$INSTALL_DIR/uninstall-linux.sh"
-    local uninstall_script_url="https://raw.githubusercontent.com/deadlock-api/deadlock-api-ingest/master/uninstall-linux.sh"
+    local uninstall_script_url="https://raw.githubusercontent.com/DTV-GG/dtv-ingest/master/uninstall-linux.sh"
 
     if curl -fsSL "$uninstall_script_url" -o "$uninstall_script_path"; then
         chmod +x "$uninstall_script_path"
@@ -544,19 +544,19 @@ main() {
             local main_created=false
             local once_created=false
 
-            if create_desktop_shortcut "$final_executable_path" "" "Deadlock API Ingest (Background)" "Monitors Steam cache for Deadlock match replays" "$APP_NAME"; then
+            if create_desktop_shortcut "$final_executable_path" "" "DTV Ingest (Background)" "Monitors Steam cache for Deadlock match replays" "$APP_NAME"; then
                 main_created=true
             fi
 
             # Create "once" shortcut for initial cache ingest only
-            if create_desktop_shortcut "$final_executable_path" "--once" "Deadlock API Ingest (Once)" "Scan existing Steam cache once and exit"; then
+            if create_desktop_shortcut "$final_executable_path" "--once" "DTV Ingest (Once)" "Scan existing Steam cache once and exit"; then
                 once_created=true
             fi
 
             if [[ "$main_created" == true && "$once_created" == true ]]; then
                 log "INFO" "Desktop shortcuts created:"
-                log "INFO" "  - Deadlock API Ingest: Start the application with monitoring"
-                log "INFO" "  - Deadlock API Ingest (Once): Run once to ingest existing cache files only"
+                log "INFO" "  - DTV Ingest: Start the application with monitoring"
+                log "INFO" "  - DTV Ingest (Once): Run once to ingest existing cache files only"
                 log "INFO" "You can also start manually: $final_executable_path"
             elif [[ "$main_created" == true ]]; then
                 log "INFO" "Main desktop shortcut created. You can also run: $final_executable_path"
@@ -573,11 +573,11 @@ main() {
     # also starts the background service if it isn't running.
     # Neither is required for the tool to work, so failures only warn.
     install_icon "$version" || true
-    if ! create_desktop_shortcut "$final_executable_path" "--gui" "Deadlock API Ingest" "See the Deadlock matches you have sent to trackers" "$APP_NAME-status"; then
+    if ! create_desktop_shortcut "$final_executable_path" "--gui" "DTV Ingest" "See the Deadlock matches you have sent to trackers" "$APP_NAME-status"; then
         log "WARN" "Could not create the app menu entry. Open the status window with: $final_executable_path --gui"
     fi
 
-    log "SUCCESS" "🚀 Deadlock API Ingest has been installed successfully!"
+    log "SUCCESS" "🚀 DTV Ingest has been installed successfully!"
 
     # The final messages should also be sent to stderr to not interfere with any potential scripting.
     {

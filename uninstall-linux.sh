@@ -1,8 +1,8 @@
 #!/bin/bash
-# Deadlock API Ingest - Uninstall Script
+# DTV Ingest - Uninstall Script
 # This script removes the application and all related components
 
-APP_NAME="deadlock-api-ingest"
+APP_NAME="dtv-ingest"
 SERVICE_NAME="$APP_NAME"
 INSTALL_DIR="$HOME/.local/share/$APP_NAME"
 BIN_SYMLINK="$HOME/.local/bin/$APP_NAME"
@@ -23,7 +23,7 @@ fi
 if [[ "$SILENT" == false ]]; then
     echo ""
     echo -e "${CYAN}========================================${NC}"
-    echo -e "${CYAN}  Deadlock API Ingest - Uninstaller${NC}"
+    echo -e "${CYAN}  DTV Ingest - Uninstaller${NC}"
     echo -e "${CYAN}========================================${NC}"
     echo ""
     echo -e "${YELLOW}This will remove:${NC}"
@@ -43,7 +43,7 @@ if [[ "$SILENT" == false ]]; then
     echo ""
 fi
 
-echo -e "${YELLOW}Uninstalling Deadlock API Ingest...${NC}"
+echo -e "${YELLOW}Uninstalling DTV Ingest...${NC}"
 echo ""
 
 # Stop and disable user service

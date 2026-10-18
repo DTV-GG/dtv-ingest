@@ -1,4 +1,4 @@
-# Deadlock API Ingest - Windows Installation Script
+# DTV Ingest - Windows Installation Script
 # This script downloads and installs the application to run automatically on user login via Task Scheduler.
 
 # Suppress PSScriptAnalyzer warnings for Write-Host in this interactive installation script
@@ -6,8 +6,8 @@
 param()
 
 # --- Configuration ---
-$AppName = "deadlock-api-ingest"
-$GithubRepo = "deadlock-api/deadlock-api-ingest"
+$AppName = "dtv-ingest"
+$GithubRepo = "DTV-GG/dtv-ingest"
 $AssetKeyword = "windows-latest.exe"
 
 # Installation Paths
@@ -196,7 +196,7 @@ function New-DesktopShortcut {
         [Parameter(Mandatory = $false)]
         [string]$ShortcutName = $AppName,
         [Parameter(Mandatory = $false)]
-        [string]$Description = "Deadlock API Ingest - Monitors Steam cache for Deadlock match replays"
+        [string]$Description = "DTV Ingest - Monitors Steam cache for Deadlock match replays"
     )
 
     Write-InstallLog -Level 'INFO' "Creating desktop shortcut: $ShortcutName..."
@@ -304,7 +304,7 @@ WshShell.Run """$ExecutablePath""" & args, 0, True
 # Wrap the entire installation in a try-catch block
 try {
     Clear-Content -Path $LogFile -ErrorAction SilentlyContinue
-    Write-InstallLog -Level 'INFO' "Starting Deadlock API Ingest installation..."
+    Write-InstallLog -Level 'INFO' "Starting DTV Ingest installation..."
     Write-InstallLog -Level 'INFO' "Log file is available at: $LogFile"
 
     $release = Get-LatestRelease
@@ -387,7 +387,7 @@ try {
     # Download uninstall script
     Write-InstallLog -Level 'INFO' "Downloading uninstall script..."
     $uninstallScriptPath = Join-Path -Path $InstallDir -ChildPath "uninstall-windows.ps1"
-    $uninstallScriptUrl = "https://raw.githubusercontent.com/deadlock-api/deadlock-api-ingest/master/uninstall-windows.ps1"
+    $uninstallScriptUrl = "https://raw.githubusercontent.com/DTV-GG/dtv-ingest/master/uninstall-windows.ps1"
 
     try {
         Invoke-WebRequest -Uri $uninstallScriptUrl -OutFile $uninstallScriptPath -UseBasicParsing
@@ -565,7 +565,7 @@ try {
             New-DesktopShortcut -ExecutablePath $downloadPath `
                 -Arguments "--once" `
                 -ShortcutName "$AppName (Once)" `
-                -Description "Deadlock API Ingest - Scan existing Steam cache once and exit"
+                -Description "DTV Ingest - Scan existing Steam cache once and exit"
 
             Write-Host "Desktop shortcuts created:" -ForegroundColor White
         } else {
@@ -581,7 +581,7 @@ try {
     New-DesktopShortcut -ExecutablePath $downloadPath `
         -Arguments "--gui" `
         -ShortcutName "$AppName (Status)" `
-        -Description "Deadlock API Ingest - Shows the matches that were submitted" | Out-Null
+        -Description "DTV Ingest - Shows the matches that were submitted" | Out-Null
 
 
 }
@@ -592,7 +592,7 @@ catch {
 # Display final status
 if (-not $script:HasErrors) {
     Write-Host " "
-    Write-InstallLog -Level 'SUCCESS' "Deadlock API Ingest has been installed successfully!"
+    Write-InstallLog -Level 'SUCCESS' "DTV Ingest has been installed successfully!"
 
     # Check if auto-start is enabled
     $autoStartEnabled = $false
@@ -632,7 +632,7 @@ if (-not $script:HasErrors) {
     Write-Host " "
 
     # --- User-friendly usage explanation ---
-    Write-Host "How to use Deadlock API Ingest:" -ForegroundColor Green
+    Write-Host "How to use DTV Ingest:" -ForegroundColor Green
     Write-Host "1. Restart your game after installation." -ForegroundColor Cyan
     Write-Host "2. Once in the game, go to your match history and click on 'matches'." -ForegroundColor Cyan
     Write-Host "3. The tool will now work in the background to enhance your experience!" -ForegroundColor Cyan

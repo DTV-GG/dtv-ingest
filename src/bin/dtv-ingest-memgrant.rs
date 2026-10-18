@@ -1,4 +1,4 @@
-//! `deadlock-api-ingest-memgrant <pid>`: opens Deadlock's memory read-only and passes the
+//! `dtv-ingest-memgrant <pid>`: opens Deadlock's memory read-only and passes the
 //! open file to the caller over the Unix socket on stdout.
 //!
 //! Most distributions only let a process open another's memory if it started it (Yama
@@ -20,7 +20,7 @@ fn main() -> ExitCode {
     match grant() {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("deadlock-api-ingest-memgrant: {e}");
+            eprintln!("dtv-ingest-memgrant: {e}");
             ExitCode::FAILURE
         }
     }
@@ -39,7 +39,7 @@ fn grant() -> Result<(), String> {
     let pid: u32 = std::env::args()
         .nth(1)
         .and_then(|arg| arg.parse().ok())
-        .ok_or("usage: deadlock-api-ingest-memgrant <pid>")?;
+        .ok_or("usage: dtv-ingest-memgrant <pid>")?;
     // Everything is opened relative to this directory, so it all belongs to the same process
     // even if the pid is reused meanwhile.
     let proc_dir = open(

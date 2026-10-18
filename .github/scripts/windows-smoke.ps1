@@ -29,7 +29,7 @@ function Get-ConsoleHost([int]$ProcessId) {
 }
 
 function Get-Ingest {
-    @(Get-CimInstance Win32_Process -Filter "Name='deadlock-api-ingest.exe'")
+    @(Get-CimInstance Win32_Process -Filter "Name='dtv-ingest.exe'")
 }
 
 # Starts like a double-click and returns how long (ms) its console window stayed up, or -1
@@ -64,16 +64,16 @@ function Save-Screenshot([string]$Name) {
 }
 
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-$uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\deadlock-api-ingest'
-$installDir = Join-Path $env:LOCALAPPDATA 'deadlock-api-ingest'
-$installed = Join-Path $installDir 'deadlock-api-ingest.exe'
-$startMenuLink = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Deadlock API Ingest.lnk'
-$desktopLink = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Deadlock API Ingest.lnk'
+$uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\dtv-ingest'
+$installDir = Join-Path $env:LOCALAPPDATA 'dtv-ingest'
+$installed = Join-Path $installDir 'dtv-ingest.exe'
+$startMenuLink = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\DTV Ingest.lnk'
+$desktopLink = Join-Path ([Environment]::GetFolderPath('Desktop')) 'DTV Ingest.lnk'
 
 # --- The exe carries its icon and version info (build.rs) ----------------------------------------
 $info = (Get-Item $Exe).VersionInfo
 Write-Host "version info: $($info.ProductName) $($info.ProductVersion) by $($info.CompanyName)"
-Test-Check 'version info embedded' { $info.ProductName -eq 'Deadlock API Ingest' -and $info.CompanyName -eq 'Deadlock API' }
+Test-Check 'version info embedded' { $info.ProductName -eq 'DTV Ingest' -and $info.CompanyName -eq 'Deadlock API' }
 Add-Type -Namespace Win32 -Name Shell -MemberDefinition @'
 [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
 public static extern uint ExtractIconEx(string file, int index, IntPtr[] large, IntPtr[] small, uint count);
@@ -88,7 +88,7 @@ New-Item -Path 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam' -Force | Out-Null
 Set-ItemProperty 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam' -Name InstallPath -Value $steam
 
 # --- Install: double-click the downloaded setup exe ------------------------------------------
-$setup = Join-Path $env:RUNNER_TEMP 'deadlock-api-ingest-setup.exe'
+$setup = Join-Path $env:RUNNER_TEMP 'dtv-ingest-setup.exe'
 Copy-Item $Exe $setup -Force
 $run = Measure-ConsoleFlash $setup @()
 Write-Host "setup: console visible for $($run.Ms) ms"
@@ -100,7 +100,7 @@ Test-Check 'exe installed to %LOCALAPPDATA%' { Test-Path $installed }
 Test-Check 'Start menu shortcut' { Test-Path $startMenuLink }
 Test-Check 'desktop shortcut' { Test-Path $desktopLink }
 Test-Check 'Apps & Features entry' { Test-Path $uninstallKey }
-Test-Check 'autostart entry' { (Get-ItemProperty $runKey -ErrorAction SilentlyContinue).'deadlock-api-ingest' }
+Test-Check 'autostart entry' { (Get-ItemProperty $runKey -ErrorAction SilentlyContinue).'dtv-ingest' }
 
 $procs = Get-Ingest
 $procs | ForEach-Object { Write-Host "running: $($_.ProcessId) $($_.CommandLine)" }
@@ -112,7 +112,7 @@ foreach ($proc in $procs) {
 Save-Screenshot '1-after-install'
 
 # --- Shortcut and sign-in autostart, started fresh -------------------------------------------
-Get-Process deadlock-api-ingest -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process dtv-ingest -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Seconds 2
 
 $watcher = Measure-ConsoleFlash $installed @()
@@ -129,20 +129,20 @@ Save-Screenshot '2-status-window'
 
 # --- From a terminal, the console must stay usable --------------------------------------------
 $version = & $installed --version
-Test-Check 'CLI output still reaches the terminal' { "$version" -like 'deadlock-api-ingest *' }
+Test-Check 'CLI output still reaches the terminal' { "$version" -like 'dtv-ingest *' }
 
 # --- Uninstall (what Apps & Features runs) ----------------------------------------------------
 $uninstall = Start-Process -FilePath $installed -ArgumentList '--uninstall' -PassThru
 Start-Sleep -Seconds 8
 Save-Screenshot '3-uninstall'
-Test-Check 'autostart entry removed' { -not (Get-ItemProperty $runKey -ErrorAction SilentlyContinue).'deadlock-api-ingest' }
+Test-Check 'autostart entry removed' { -not (Get-ItemProperty $runKey -ErrorAction SilentlyContinue).'dtv-ingest' }
 Test-Check 'Apps & Features entry removed' { -not (Test-Path $uninstallKey) }
 Test-Check 'shortcuts removed' { -not (Test-Path $startMenuLink) -and -not (Test-Path $desktopLink) }
 Test-Check 'other instances stopped' { -not (Get-Ingest | Where-Object { $_.ProcessId -ne $uninstall.Id }) }
 
 # Confirm the "uninstalled" message box; the install folder is removed after that.
 $shell = New-Object -ComObject WScript.Shell
-if ($shell.AppActivate('Deadlock API Ingest')) { $shell.SendKeys('{ENTER}') }
+if ($shell.AppActivate('DTV Ingest')) { $shell.SendKeys('{ENTER}') }
 if ($uninstall.WaitForExit(10000)) {
     Start-Sleep -Seconds 5
     if (Test-Path $installDir) { Write-Host "::warning::install folder still present after uninstall" }

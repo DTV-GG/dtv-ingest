@@ -34,7 +34,7 @@ impl TestProcess {
         // Start the application process
         // Note: The application requires elevated privileges for packet capture,
         // but in CI/test environments we'll use a mock or limited mode
-        let child = Command::new("target/release/deadlock-api-ingest")
+        let child = Command::new("target/release/dtv-ingest")
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()?;

@@ -113,12 +113,12 @@ BEGIN
     BLOCK "040904b0"
     BEGIN
       VALUE "CompanyName", "Deadlock API"
-      VALUE "FileDescription", "Deadlock API Ingest"
+      VALUE "FileDescription", "DTV Ingest"
       VALUE "FileVersion", "{version}"
-      VALUE "InternalName", "deadlock-api-ingest"
+      VALUE "InternalName", "dtv-ingest"
       VALUE "LegalCopyright", "Copyright (c) 2025 Deadlock API Contributors"
-      VALUE "OriginalFilename", "deadlock-api-ingest.exe"
-      VALUE "ProductName", "Deadlock API Ingest"
+      VALUE "OriginalFilename", "dtv-ingest.exe"
+      VALUE "ProductName", "DTV Ingest"
       VALUE "ProductVersion", "{version}"
     END
   END

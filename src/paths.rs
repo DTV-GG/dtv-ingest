@@ -2,11 +2,11 @@
 
 use std::path::PathBuf;
 
-pub(crate) const APP_NAME: &str = "deadlock-api-ingest";
+pub(crate) const APP_NAME: &str = "dtv-ingest";
 
-/// - Linux: `~/.local/share/deadlock-api-ingest/`
-/// - macOS: `~/Library/Application Support/deadlock-api-ingest/`
-/// - Windows: `C:\Users\<User>\AppData\Roaming\deadlock-api-ingest\`
+/// - Linux: `~/.local/share/dtv-ingest/`
+/// - macOS: `~/Library/Application Support/dtv-ingest/`
+/// - Windows: `C:\Users\<User>\AppData\Roaming\dtv-ingest\`
 pub(crate) fn data_dir() -> Option<PathBuf> {
     let dir = dirs::data_dir()?.join(APP_NAME);
     std::fs::create_dir_all(&dir).ok()?;
