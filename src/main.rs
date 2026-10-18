@@ -20,7 +20,7 @@ use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-/// Deadlock API Ingest — uploads match data from Steam's HTTP cache.
+/// DTV Ingest — uploads match data from Steam's HTTP cache.
 #[derive(Parser)]
 #[command(version)]
 #[allow(clippy::struct_excessive_bools)] // clap flags
@@ -54,15 +54,25 @@ struct Args {
     #[arg(long, conflicts_with_all = ["once", "no_gc", "own_matches", "command"])]
     uninstall: bool,
 
+    /// Link this app to your DTV account with the token from your DTV profile
+    /// (<https://dtv.gg/profile>), send the matches already submitted, then exit
+    #[arg(long, value_name = "TOKEN", conflicts_with_all = ["once", "own_matches", "gui", "install", "uninstall", "command"])]
+    dtv_token: Option<String>,
+
+    /// Unlink this app from DTV, then exit
+    #[arg(long, conflicts_with_all = ["once", "own_matches", "gui", "install", "uninstall", "command", "dtv_token"])]
+    dtv_logout: bool,
+
     /// Game command to wrap (launch wrapper mode).
     /// When provided, the watcher runs in the background while the game
     /// runs as a child process, and exits when the game exits.
-    /// Usage: deadlock-api-ingest -- %command%
+    /// Usage: dtv-ingest -- %command%
     #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
     command: Vec<String>,
 }
 
 mod console;
+mod dtv;
 mod error;
 mod game_memory;
 mod game_names;
@@ -97,7 +107,7 @@ fn init_tracing(log_to_file: bool) {
         .and_then(|log_dir| {
             tracing_appender::rolling::RollingFileAppender::builder()
                 .rotation(tracing_appender::rolling::Rotation::DAILY)
-                .filename_prefix("deadlock-api-ingest")
+                .filename_prefix("dtv-ingest")
                 .filename_suffix("log")
                 .max_log_files(7)
                 .build(&log_dir)
@@ -140,7 +150,7 @@ fn acquire_instance_lock() -> Option<File> {
             }
         }
     }
-    info!("Another deadlock-api-ingest instance is already running, exiting.");
+    info!("Another dtv-ingest instance is already running, exiting.");
     std::process::exit(0);
 }
 
@@ -168,6 +178,43 @@ fn run_launch_wrapper<F: FnOnce() + Send + 'static>(background_work: F, command:
     }
 }
 
+/// Runs `--dtv-token` / `--dtv-logout` and exits; returns for every other mode.
+fn exit_on_dtv_command(args: &Args) {
+    if let Some(token) = &args.dtv_token {
+        std::process::exit(link_dtv(token));
+    }
+    if args.dtv_logout {
+        std::process::exit(match dtv::clear_token() {
+            Ok(()) => {
+                info!("Unlinked from DTV.");
+                0
+            }
+            Err(e) => {
+                error!("{e}");
+                1
+            }
+        });
+    }
+}
+
+/// `--dtv-token`: checks the token with DTV, saves it, then sends what was already submitted.
+fn link_dtv(token: &str) -> i32 {
+    match dtv::whoami(token).and_then(|username| {
+        dtv::save_token(token)?;
+        Ok(username)
+    }) {
+        Ok(username) => {
+            info!("Linked to DTV as {username}.");
+            dtv::send_logged();
+            0
+        }
+        Err(e) => {
+            error!("{e}");
+            1
+        }
+    }
+}
+
 fn main() {
     let args = Args::parse();
     let setup = args.install || install::launched_as_setup();
@@ -185,6 +232,8 @@ fn main() {
         };
         std::process::exit(exit_code);
     }
+
+    exit_on_dtv_command(&args);
 
     if let Some(log_dir) = paths::log_dir() {
         info!("Log files are being written to: {}", log_dir.display());
@@ -300,7 +349,7 @@ mod tests {
             "--uninstall",
         ] {
             assert!(
-                Args::try_parse_from(["deadlock-api-ingest", "--no-memory", mode]).is_ok(),
+                Args::try_parse_from(["dtv-ingest", "--no-memory", mode]).is_ok(),
                 "--no-memory {mode}"
             );
         }

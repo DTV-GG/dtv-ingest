@@ -119,6 +119,7 @@ impl Salts {
         if self.match_id > MAX_MATCH_ID {
             return Err(Error::MatchIdTooLarge);
         }
+        crate::dtv::send(core::slice::from_ref(self));
 
         let max_retries = 10;
         let mut attempt = 0;
@@ -154,6 +155,7 @@ impl Salts {
     }
 
     fn ingest_batch(salts: &[Salts], source: Source) -> Result<(), Error> {
+        crate::dtv::send(salts);
         let max_retries = 10;
         let num_salts = salts.len();
         let mut attempt = 0;

@@ -64,7 +64,7 @@ impl GcStore {
     pub(crate) fn open() -> Result<Self, GcError> {
         let dir = dirs::data_dir()
             .ok_or_else(|| GcError::Store("no data dir".into()))?
-            .join("deadlock-api-ingest");
+            .join("dtv-ingest");
         std::fs::create_dir_all(&dir).map_err(|e| store_err("mkdir failed", e))?;
         let lock = File::create(dir.join(LOCK_FILE)).map_err(|e| store_err("lock file", e))?;
         lock.try_lock().map_err(|e| match e {

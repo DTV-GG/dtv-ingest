@@ -878,45 +878,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
 
 [[package]]
-name = "deadlock-api-ingest"
-version = "0.4.4"
-dependencies = [
- "aes 0.9.3",
- "base64 0.23.1",
- "cbc 0.2.1",
- "clap",
- "crc32fast",
- "dirs",
- "embed-resource",
- "futures-util",
- "hex",
- "iced",
- "ico",
- "keyvalues-parser",
- "memchr",
- "mslnk",
- "notify",
- "prost",
- "rustix 1.1.5",
- "serde",
- "serde_json",
- "sha2",
- "steam-vent",
- "steamlocate",
- "sysinfo",
- "tokio",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "ureq",
- "valveprotos",
- "walkdir",
- "windows-dpapi",
- "windows-sys 0.61.2",
- "winreg",
-]
-
-[[package]]
 name = "der"
 version = "0.7.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1048,6 +1009,45 @@ name = "dtor"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "edf234dd1594d6dd434a8fb8cada51ddbbc593e40e4a01556a0b31c62da2775b"
+
+[[package]]
+name = "dtv-ingest"
+version = "1.0.0"
+dependencies = [
+ "aes 0.9.3",
+ "base64 0.23.1",
+ "cbc 0.2.1",
+ "clap",
+ "crc32fast",
+ "dirs",
+ "embed-resource",
+ "futures-util",
+ "hex",
+ "iced",
+ "ico",
+ "keyvalues-parser",
+ "memchr",
+ "mslnk",
+ "notify",
+ "prost",
+ "rustix 1.1.5",
+ "serde",
+ "serde_json",
+ "sha2",
+ "steam-vent",
+ "steamlocate",
+ "sysinfo",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "ureq",
+ "valveprotos",
+ "walkdir",
+ "windows-dpapi",
+ "windows-sys 0.61.2",
+ "winreg",
+]
 
 [[package]]
 name = "dunce"

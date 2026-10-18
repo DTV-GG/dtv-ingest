@@ -1,4 +1,4 @@
-//! Self-installer used by `deadlock-api-ingest-setup.exe` (the release exe under another
+//! Self-installer used by `dtv-ingest-setup.exe` (the release exe under another
 //! name) and `--install` / `--uninstall`. Per-user only, so no admin rights are needed.
 
 use std::path::Path;
@@ -30,7 +30,7 @@ pub(crate) fn run_install() -> i32 {
 pub(crate) fn run_uninstall() -> i32 {
     match platform::uninstall() {
         Ok(()) => {
-            console::message_box("Deadlock API Ingest has been uninstalled.", false);
+            console::message_box("DTV Ingest has been uninstalled.", false);
             // Last, so the box can stay open as long as it likes before we exit.
             platform::remove_install_dir_after_exit();
             0
@@ -56,9 +56,8 @@ mod platform {
     use crate::service::windows::RUN_KEY;
     use crate::service::{quiet, run_quiet, spawn_detached, stop_other_instances};
 
-    const DISPLAY_NAME: &str = "Deadlock API Ingest";
-    const UNINSTALL_KEY: &str =
-        r"Software\Microsoft\Windows\CurrentVersion\Uninstall\deadlock-api-ingest";
+    const DISPLAY_NAME: &str = "DTV Ingest";
+    const UNINSTALL_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\dtv-ingest";
 
     /// Same directory as install-windows.ps1, so script installs are upgraded in place.
     fn install_dir() -> Result<PathBuf, String> {
@@ -80,9 +79,7 @@ mod platform {
         shortcut.set_arguments(Some("--gui".to_owned()));
         shortcut.set_working_dir(Some(dir.display().to_string()));
         shortcut.set_icon_location(Some(exe.display().to_string()));
-        shortcut.set_name(Some(
-            "Shows what Deadlock API Ingest is uploading".to_owned(),
-        ));
+        shortcut.set_name(Some("Shows what DTV Ingest is uploading".to_owned()));
         if let Some(parent) = lnk.parent() {
             std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         }
@@ -159,7 +156,7 @@ mod platform {
         let _ = run_quiet("schtasks", &["/Delete", "/TN", APP_NAME, "/F"]);
 
         let mut shortcuts = shortcut_paths();
-        // install-windows.ps1 names its desktop shortcuts `deadlock-api-ingest*.lnk`.
+        // install-windows.ps1 names its desktop shortcuts `dtv-ingest*.lnk`.
         if let Some(desktop) = dirs::desktop_dir()
             && let Ok(entries) = std::fs::read_dir(desktop)
         {
@@ -220,15 +217,15 @@ mod tests {
     #[test]
     fn test_setup_name_detection() {
         for name in [
-            "deadlock-api-ingest-setup.exe",
+            "dtv-ingest-setup.exe",
             "Deadlock-API-Ingest-Setup (1).exe",
-            "/tmp/deadlock-api-ingest-setup",
+            "/tmp/dtv-ingest-setup",
         ] {
             assert!(is_setup_name(Path::new(name)), "{name}");
         }
         for name in [
-            "deadlock-api-ingest.exe",
-            "deadlock-api-ingest-windows-latest.exe",
+            "dtv-ingest.exe",
+            "dtv-ingest-windows-latest.exe",
             "setup.exe",
         ] {
             assert!(!is_setup_name(Path::new(name)), "{name}");

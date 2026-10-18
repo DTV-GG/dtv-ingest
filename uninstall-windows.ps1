@@ -1,17 +1,17 @@
-# Deadlock API Ingest - Uninstall Script
+# DTV Ingest - Uninstall Script
 # This script removes the application and all related components
 
 param(
     [switch]$Silent
 )
 
-$AppName = "deadlock-api-ingest"
+$AppName = "dtv-ingest"
 $InstallDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath $AppName
 
 if (-not $Silent) {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "  Deadlock API Ingest - Uninstaller" -ForegroundColor Cyan
+    Write-Host "  DTV Ingest - Uninstaller" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "This will remove:" -ForegroundColor Yellow
@@ -29,7 +29,7 @@ if (-not $Silent) {
     Write-Host ""
 }
 
-Write-Host "Uninstalling Deadlock API Ingest..." -ForegroundColor Yellow
+Write-Host "Uninstalling DTV Ingest..." -ForegroundColor Yellow
 Write-Host ""
 
 # Stop and remove all scheduled tasks (current and old versions)

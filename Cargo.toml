@@ -1,8 +1,8 @@
 [package]
-name = "deadlock-api-ingest"
-version = "0.4.4"
-description = "Deadlock API Ingest"
-repository = "https://github.com/deadlock-api/deadlock-api-ingest"
+name = "dtv-ingest"
+version = "1.0.0"
+description = "DTV Ingest"
+repository = "https://github.com/DTV-GG/dtv-ingest"
 license = "MIT"
 edition = "2024"
 

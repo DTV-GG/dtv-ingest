@@ -10,10 +10,13 @@ use std::sync::{Arc, Mutex};
 use iced::border;
 use iced::font::Weight;
 use iced::theme::Palette;
-use iced::widget::{Space, button, column, container, row, scrollable, space, text, tooltip};
+use iced::widget::{
+    Space, button, column, container, row, scrollable, space, text, text_input, tooltip,
+};
 use iced::{Alignment, Color, Element, Font, Length, Size, Subscription, Task, Theme, color};
 use tracing::{error, warn};
 
+use crate::dtv;
 use crate::service;
 use crate::update::{self, Update};
 use data::{DAY_SECS, MatchRow, Snapshot, Stats, Tracker};
@@ -29,17 +32,17 @@ const BOLD: Font = Font {
 
 pub(crate) fn run() -> i32 {
     let result = iced::application(App::boot, App::update, App::view)
-        .title("Deadlock API Ingest")
+        .title("DTV Ingest")
         .font(include_bytes!("../../assets/fonts/FiraSans-Regular.ttf"))
         .font(include_bytes!("../../assets/fonts/FiraSans-Bold.ttf"))
         .default_font(FONT)
         .subscription(App::subscription)
         .theme(App::theme)
         .window(iced::window::Settings {
-            size: Size::new(720.0, 640.0),
+            size: Size::new(720.0, 760.0),
             min_size: Some(Size::new(520.0, 480.0)),
             icon: window_icon(),
-            // The name of install-linux.sh's desktop entry (deadlock-api-ingest-status.desktop),
+            // The name of install-linux.sh's desktop entry (dtv-ingest-status.desktop),
             // which Wayland desktops match against the app_id and X11 ones against
             // StartupWMClass, so the open window shows under that launcher and icon.
             #[cfg(target_os = "linux")]
@@ -77,6 +80,21 @@ enum Message {
     UpdateChecked(Result<Option<Update>, String>),
     ApplyUpdate,
     UpdateApplied(Result<(), String>),
+    DtvChecked(Result<Option<String>, String>),
+    DtvInput(String),
+    DtvLink,
+    DtvLinked(Result<String, String>),
+    DtvUnlink,
+}
+
+/// The link to the player's DTV account (see [`dtv`]).
+enum DtvState {
+    Checking,
+    Unlinked,
+    Linking,
+    Linked(String),
+    /// A refused token or DTV unreachable; the input stays open to paste another one.
+    Failed(String),
 }
 
 enum UpdateState {
@@ -103,6 +121,8 @@ struct App {
     update: UpdateState,
     /// A refresh is in flight; ticks are skipped so a slow first read can't pile them up.
     refreshing: bool,
+    dtv: DtvState,
+    dtv_input: String,
 }
 
 impl App {
@@ -126,8 +146,10 @@ impl App {
             start: StartState::Starting,
             update: UpdateState::Checking,
             refreshing: false,
+            dtv: DtvState::Checking,
+            dtv_input: String::new(),
         };
-        let tasks = [app.refresh(), check_update(), start_service()];
+        let tasks = [app.refresh(), check_update(), start_service(), check_dtv()];
         (app, Task::batch(tasks))
     }
 
@@ -189,6 +211,43 @@ impl App {
                 }
                 Task::none()
             }
+            Message::DtvChecked(result) => {
+                self.dtv = match result {
+                    Ok(Some(username)) => DtvState::Linked(username),
+                    Ok(None) => DtvState::Unlinked,
+                    Err(e) => DtvState::Failed(e),
+                };
+                Task::none()
+            }
+            Message::DtvInput(value) => {
+                self.dtv_input = value;
+                Task::none()
+            }
+            Message::DtvLink => {
+                let token = self.dtv_input.trim().to_owned();
+                if token.is_empty() || matches!(self.dtv, DtvState::Linking) {
+                    return Task::none();
+                }
+                self.dtv = DtvState::Linking;
+                Task::perform(blocking(move || link_dtv(&token)), Message::DtvLinked)
+            }
+            Message::DtvLinked(result) => {
+                self.dtv = match result {
+                    Ok(username) => {
+                        self.dtv_input.clear();
+                        DtvState::Linked(username)
+                    }
+                    Err(e) => DtvState::Failed(e),
+                };
+                Task::none()
+            }
+            Message::DtvUnlink => {
+                self.dtv = match dtv::clear_token() {
+                    Ok(()) => DtvState::Unlinked,
+                    Err(e) => DtvState::Failed(e),
+                };
+                Task::none()
+            }
         }
     }
 
@@ -230,12 +289,9 @@ impl App {
             _ => "",
         };
         let footer = row![
-            text(format!(
-                "Deadlock API Ingest v{}",
-                env!("CARGO_PKG_VERSION")
-            ))
-            .size(11)
-            .style(text::secondary),
+            text(format!("DTV Ingest v{}", env!("CARGO_PKG_VERSION")))
+                .size(11)
+                .style(text::secondary),
             space::horizontal(),
             text(update_status).size(11).style(text::secondary),
         ];
@@ -246,6 +302,7 @@ impl App {
         }
         content
             .push(self.status_banner())
+            .push(self.dtv_card())
             .push(stat_cards(&stats, now))
             .push(recent_matches(recent, now))
             .push(footer)
@@ -295,6 +352,78 @@ impl App {
                 .style(update_card)
                 .into(),
         )
+    }
+
+    /// Linking the app to a DTV account, or the account it sends to.
+    fn dtv_card(&self) -> Element<'_, Message> {
+        let palette = self.theme.palette();
+        let (dot, title, detail) = match &self.dtv {
+            DtvState::Checking => (palette.warning, "DTV".to_owned(), "Checking…".to_owned()),
+            DtvState::Linked(username) => (
+                palette.success,
+                format!("Linked to DTV as {username}"),
+                "Your matches also go to dtv.gg, which adds your tournament games by itself."
+                    .to_owned(),
+            ),
+            DtvState::Unlinked | DtvState::Linking => (
+                palette.warning,
+                "Link to DTV".to_owned(),
+                "Paste the token from your profile on dtv.gg so your tournament games show up \
+                 there."
+                    .to_owned(),
+            ),
+            DtvState::Failed(e) => (palette.danger, "Link to DTV".to_owned(), e.clone()),
+        };
+
+        let mut content = row![
+            status_dot(dot),
+            column![
+                text(title).size(16).font(BOLD),
+                text(detail).size(13).style(text::secondary),
+            ]
+            .spacing(4)
+            .width(Length::Fill),
+        ]
+        .spacing(14)
+        .align_y(Alignment::Center);
+
+        let body: Element<'_, Message> = match &self.dtv {
+            DtvState::Checking => content.into(),
+            DtvState::Linked(_) => {
+                content = content.push(
+                    button(text("Unlink").font(BOLD))
+                        .padding([8, 18])
+                        .style(button::secondary)
+                        .on_press(Message::DtvUnlink),
+                );
+                content.into()
+            }
+            DtvState::Unlinked | DtvState::Linking | DtvState::Failed(_) => {
+                let linking = matches!(self.dtv, DtvState::Linking);
+                let input = text_input("dtvi_…", &self.dtv_input)
+                    .on_input(Message::DtvInput)
+                    .on_submit(Message::DtvLink)
+                    .secure(true)
+                    .padding(8);
+                let link = button(text(if linking { "Linking…" } else { "Link" }).font(BOLD))
+                    .padding([8, 18])
+                    .on_press_maybe(
+                        (!linking && !self.dtv_input.trim().is_empty()).then_some(Message::DtvLink),
+                    );
+                column![
+                    content,
+                    row![input, link].spacing(10).align_y(Alignment::Center)
+                ]
+                .spacing(12)
+                .into()
+            }
+        };
+
+        container(body)
+            .padding(18)
+            .width(Length::Fill)
+            .style(card)
+            .into()
     }
 
     fn status_banner(&self) -> Element<'_, Message> {
@@ -559,6 +688,22 @@ fn time_ago(now: i64, then: i64) -> String {
 
 fn check_update() -> Task<Message> {
     Task::perform(blocking(update::check), Message::UpdateChecked)
+}
+
+fn check_dtv() -> Task<Message> {
+    Task::perform(
+        blocking(|| dtv::token().map(|token| dtv::whoami(&token)).transpose()),
+        Message::DtvChecked,
+    )
+}
+
+/// Checks the token with DTV and saves it, then sends the matches already submitted in the
+/// background: until now they only went to deadlock-api.
+fn link_dtv(token: &str) -> Result<String, String> {
+    let username = dtv::whoami(token)?;
+    dtv::save_token(token)?;
+    std::thread::spawn(dtv::send_logged);
+    Ok(username)
 }
 
 fn start_service() -> Task<Message> {

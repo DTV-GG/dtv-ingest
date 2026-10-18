@@ -20,11 +20,11 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
-    cargo build --release --bin deadlock-api-ingest
+    cargo build --release --bin dtv-ingest
 
 # We do not need the Rust toolchain to run the binary!
 FROM debian:trixie-slim AS runtime
-LABEL org.opencontainers.image.source="https://github.com/deadlock-api/deadlock-api-ingest" \
+LABEL org.opencontainers.image.source="https://github.com/DTV-GG/dtv-ingest" \
       org.opencontainers.image.description="Deadlock API ingest service" \
       org.opencontainers.image.licenses="MIT"
 RUN apt-get update \
@@ -32,6 +32,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates libssl-dev openssl libc6 \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY --from=builder /app/target/release/deadlock-api-ingest /usr/local/bin
+COPY --from=builder /app/target/release/dtv-ingest /usr/local/bin
 # A container cannot see the game's process, so its memory is not read.
-ENTRYPOINT ["/usr/local/bin/deadlock-api-ingest", "--no-memory"]
+ENTRYPOINT ["/usr/local/bin/dtv-ingest", "--no-memory"]
