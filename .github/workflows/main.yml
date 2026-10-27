@@ -15,7 +15,9 @@ permissions:
   security-events: write
 
 concurrency:
-  cancel-in-progress: true
+  # Master runs publish releases and the Docker image, so they queue instead of cancelling
+  # each other halfway through a publish; other branches only need their newest run.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
   group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
@@ -90,9 +92,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install protoc
-        uses: arduino/setup-protoc@v3
+        uses: taiki-e/install-action@v2
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          tool: protoc
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -120,9 +122,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Install protoc
-        uses: arduino/setup-protoc@v3
+        uses: taiki-e/install-action@v2
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          tool: protoc
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -162,7 +164,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: ubuntu-latest
+          # The binary needs the build runner's glibc or newer: 22.04's (2.35) also runs on
+          # Ubuntu 22.04 and Debian 12, where a 24.04 build (2.38) doesn't start. The asset
+          # keeps its name, which the installers and the self-updater look for.
+          - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             binary_name: dtv-ingest
             asset_name: dtv-ingest-ubuntu-latest
@@ -179,14 +184,15 @@ jobs:
         with:
           fetch-depth: 0  # Fetch full history for proper versioning
       - name: Install protoc
-        uses: arduino/setup-protoc@v3
+        uses: taiki-e/install-action@v2
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          tool: protoc
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: "build-cache-${{ runner.os }}-${{ runner.arch }}-stable"
-          key: "${{ matrix.target }}"
+          # Per runner image, not shared with lint and test on ubuntu-latest: C code compiled
+          # against a newer glibc's headers doesn't link on ubuntu-22.04.
+          shared-key: "build-${{ matrix.platform }}-${{ runner.arch }}-stable"
       - name: Update Rust toolchain
         run: |
           rustup override set stable
@@ -202,7 +208,7 @@ jobs:
           SHORT_SHA=$(git rev-parse --short HEAD)
           VERSION="v${CARGO_VERSION}"
           VERSION_SHA="v${CARGO_VERSION}-${SHORT_SHA}"
-          EXISTING_TAGS=$(gh release list --repo ${{ github.repository }} --json tagName -q '.[].tagName' || echo "")
+          EXISTING_TAGS=$(gh release list --repo ${{ github.repository }} --limit 1000 --json tagName -q '.[].tagName' || echo "")
           if echo "$EXISTING_TAGS" | grep -x "$VERSION"; then
             echo "Release for version $VERSION already exists. Creating a pre-release."
             echo "version=$VERSION_SHA" >> $GITHUB_OUTPUT
@@ -214,7 +220,7 @@ jobs:
       - name: Build release binary
         run: cargo build --locked --release --target ${{ matrix.target }}
       - name: Prepare binary (Linux)
-        if: matrix.platform == 'ubuntu-latest'
+        if: matrix.platform == 'ubuntu-22.04'
         run: |
           cp target/${{ matrix.target }}/release/${{ matrix.binary_name }} ${{ matrix.asset_name }}
           # The memory helper install-linux.sh sets up; its name must not contain "ubuntu-latest".
@@ -235,7 +241,7 @@ jobs:
           path: ${{ matrix.asset_name }}
           retention-days: 1
       - name: Upload memory helper artifact (Linux)
-        if: matrix.platform == 'ubuntu-latest'
+        if: matrix.platform == 'ubuntu-22.04'
         uses: actions/upload-artifact@v5
         with:
           name: dtv-ingest-memgrant-linux
@@ -279,6 +285,12 @@ jobs:
     needs: [ build, windows-smoke ]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+      # For the build provenance attestation of the release files
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - uses: actions/checkout@v5
       - name: Download all artifacts
@@ -289,13 +301,21 @@ jobs:
         run: |
           mkdir -p ./release-assets
           find ./artifacts -name "dtv-ingest-*" -type f -exec cp {} ./release-assets/ \;
+          cp install-linux.sh install-windows.ps1 ./release-assets/
+          (cd ./release-assets && sha256sum * > SHA256SUMS)
           ls -la ./release-assets/
+      - name: Attest release assets
+        uses: actions/attest@v4
+        with:
+          subject-path: ./release-assets/*
       - name: Create Release
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.build.outputs.version }}
+          # Without it the tag goes on master's head at release time, not on the commit built.
+          target_commitish: ${{ github.sha }}
           name: |
             ${{ needs.build.outputs.is_prerelease == 'true' && 'Nightly - ' || '' }}DTV Ingest ${{ needs.build.outputs.version }}
           body: |
@@ -307,14 +327,16 @@ jobs:
             ```bash
             curl -fsSL https://github.com/DTV-GG/dtv-ingest/releases/download/${{ needs.build.outputs.version }}/install-linux.sh | bash
             ```
+            Sans curl (Ubuntu de base n'a que wget) :
+            ```bash
+            wget -O- https://github.com/DTV-GG/dtv-ingest/releases/download/${{ needs.build.outputs.version }}/install-linux.sh | bash
+            ```
 
             Puis colle le jeton de ton profil sur https://dtv.gg dans la fenêtre de l'appli.
 
             Commit ${{ github.sha }}
           files: |
             ./release-assets/*
-            ./install-linux.sh
-            ./install-windows.ps1
             ./README.md
           draft: false
           prerelease: ${{ needs.build.outputs.is_prerelease }}

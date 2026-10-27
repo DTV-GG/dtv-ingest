@@ -3,15 +3,21 @@
 # DTV Ingest - Linux Installation Script
 # This script downloads and installs the dtv-ingest application as a systemd user service
 
-set -euo pipefail
+# -E: the ERR trap below also fires inside functions, where all the work runs.
+set -Eeuo pipefail
 
 # --- Configuration ---
 APP_NAME="dtv-ingest"
 GITHUB_REPO="DTV-GG/dtv-ingest"
-ASSET_KEYWORD="ubuntu-latest" # Keyword to find in the release asset filename
+# The latest release's assets, by name; no API call or JSON parsing needed.
+RELEASE_URL="https://github.com/$GITHUB_REPO/releases/latest/download"
+MAIN_ASSET="${APP_NAME}-ubuntu-latest"
 
 # Installation paths (User-level, no root required)
 INSTALL_DIR="$HOME/.local/share/$APP_NAME"
+# Outside INSTALL_DIR, which the old installation's uninstaller deletes, and on the same
+# filesystem, so the checked binary can be moved into place.
+DOWNLOAD_PATH="$HOME/.local/share/.$APP_NAME-download"
 BIN_DIR="$HOME/.local/bin"
 FINAL_EXECUTABLE_NAME=$APP_NAME
 
@@ -21,7 +27,8 @@ HELPER_PATH="/usr/local/libexec/$APP_NAME/${APP_NAME}-memgrant"
 
 # Service and logging
 SERVICE_NAME=$APP_NAME
-LOG_FILE="/tmp/${APP_NAME}-install.log"
+# Per user: a fixed path in /tmp left by one user (or a sudo run) can't be written by the next.
+LOG_FILE="${XDG_CACHE_HOME:-$HOME/.cache}/$APP_NAME/install.log"
 SYSTEMD_USER_DIR="$HOME/.config/systemd/user"
 SYSTEMD_SERVICE_FILE="$SYSTEMD_USER_DIR/${SERVICE_NAME}.service"
 
@@ -59,6 +66,7 @@ log() {
     echo -e "${color}${log_message}${NC}" >&2
 
     # The log file is written to separately and is unaffected.
+    mkdir -p "$(dirname "$LOG_FILE")"
     echo "$log_message" >> "$LOG_FILE"
 }
 
@@ -76,20 +84,31 @@ execute_quietly() {
     fi
 }
 
+# Downloads $1 to $2, with wget where curl isn't installed (Ubuntu's desktop install has no curl).
+# $2 is replaced only once the download succeeds: wget empties its output file on a 404.
+fetch() {
+    local part="$2.part"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL --user-agent "Bash-Installer" -o "$part" "$1" 2>> "$LOG_FILE"
+    else
+        wget -q --user-agent="Bash-Installer" -O "$part" "$1" 2>> "$LOG_FILE"
+    fi && mv -f "$part" "$2" && return 0
+    echo "Download failed: $1" >> "$LOG_FILE"
+    rm -f "$part"
+    return 1
+}
+
 # Function to check for required dependencies
 check_dependencies() {
-    local missing_deps=()
-    for pkg in curl wget jq; do
-        command -v "$pkg" >/dev/null 2>&1 || missing_deps+=("$pkg")
-    done
-
-    if [[ ${#missing_deps[@]} -eq 0 ]]; then
+    if command -v curl >/dev/null 2>&1 || command -v wget >/dev/null 2>&1; then
         log "SUCCESS" "All dependencies are already installed."
         return 0
     fi
 
-    log "WARN" "Missing dependencies: ${missing_deps[*]}"
-    log "INFO" "Please install them using your package manager. For example:"
+    # Either curl or wget is enough; suggest curl.
+    local missing_deps=(curl)
+    log "WARN" "Neither curl nor wget is installed."
+    log "INFO" "Install one with your package manager, for example:"
 
     if command -v apt-get >/dev/null 2>&1; then
         log "INFO" "  sudo apt-get install ${missing_deps[*]}"
@@ -111,40 +130,10 @@ check_dependencies() {
     exit 1
 }
 
-# Function to get latest release info from GitHub API
-get_latest_release() {
-    local api_url="https://api.github.com/repos/$GITHUB_REPO/releases/latest"
-
-    local response
-    response=$(curl -s -f --user-agent "Bash-Installer" "$api_url") || {
-        log "ERROR" "Failed to fetch release information from GitHub API."
-        exit 1
-    }
-
-    local asset_info
-    asset_info=$(echo "$response" | jq --arg keyword "$ASSET_KEYWORD" '([.assets[] | select(.name | contains($keyword))])[0]')
-
-    if [[ -z "$asset_info" || "$asset_info" == "null" ]]; then
-        log "ERROR" "Could not find a release asset containing the keyword: '$ASSET_KEYWORD'"
-        log "INFO" "Available assets are: $(echo "$response" | jq -r '.assets[].name')"
-        exit 1
-    fi
-
-    local version download_url size helper_url
-    version=$(echo "$response" | jq -r '.tag_name')
-    download_url=$(echo "$asset_info" | jq -r '.browser_download_url')
-    size=$(echo "$asset_info" | jq -r '.size')
-    helper_url=$(echo "$response" | jq -r --arg name "$HELPER_ASSET" '[.assets[] | select(.name == $name)][0].browser_download_url // empty')
-
-    # This is the only line that should print to stdout, to be captured by the calling variable.
-    echo "$version|$download_url|$size|$helper_url"
-}
-
-# Function to download file with progress
+# Function to download file
 download_file() {
     local url="$1"
     local output_path="$2"
-    local expected_size="$3"
 
     mkdir -p "$(dirname "$output_path")"
 
@@ -152,18 +141,29 @@ download_file() {
     echo "Downloading from: $url" >> "$LOG_FILE"
     echo "Saving to: $output_path" >> "$LOG_FILE"
 
-    if ! wget --progress=dot:giga --user-agent="Bash-Installer" -O "$output_path" "$url" 2>> "$LOG_FILE"; then
-        log "ERROR" "Download failed."
+    if ! fetch "$url" "$output_path"; then
+        log "ERROR" "Download failed (details in $LOG_FILE)."
+        rm -f "$output_path"
         exit 1
     fi
 
     log "SUCCESS" "Download complete."
+}
 
-    local actual_size
-    actual_size=$(stat -c%s "$output_path")
+# Runs the downloaded binary once, so one this system can't run (e.g. too old a glibc) stops
+# the install before the current installation is removed.
+check_binary_runs() {
+    local path="$1"
+    chmod +x "$path"
 
-    if [[ "$actual_size" != "$expected_size" ]]; then
-        log "ERROR" "File size mismatch! Expected: $expected_size bytes, Got: $actual_size bytes."
+    local version_output line
+    if ! version_output=$("$path" --version 2>&1); then
+        log "ERROR" "The downloaded binary does not run on this system:"
+        while IFS= read -r line; do log "ERROR" "  $line"; done <<< "$version_output"
+        if [[ "$version_output" == *GLIBC_* ]]; then
+            log "INFO" "It needs a newer glibc than this system has; a newer release of your distribution has one."
+        fi
+        rm -f "$path"
         exit 1
     fi
 }
@@ -171,11 +171,10 @@ download_file() {
 # Installs the app icon into the user's icon theme, so desktop entries can use Icon=$APP_NAME.
 # Best effort: entries without it still work, just with a generic icon.
 install_icon() {
-    local version="$1"
     local icon_dir="$HOME/.local/share/icons/hicolor/256x256/apps"
-    local icon_url="https://raw.githubusercontent.com/$GITHUB_REPO/$version/assets/icon.png"
+    local icon_url="https://raw.githubusercontent.com/$GITHUB_REPO/master/assets/icon.png"
 
-    if ! mkdir -p "$icon_dir" 2>/dev/null || ! curl -fsSL "$icon_url" -o "$icon_dir/$APP_NAME.png" 2>> "$LOG_FILE"; then
+    if ! mkdir -p "$icon_dir" 2>/dev/null || ! fetch "$icon_url" "$icon_dir/$APP_NAME.png"; then
         log "WARN" "Could not install the app icon; shortcuts will use a generic icon."
         return 1
     fi
@@ -320,13 +319,8 @@ EOF
 # distributions only let a program read another's memory if it started it, and Steam starts
 # the game, so the helper gets that one right (cap_sys_ptrace) and is kept root-owned.
 install_memory_helper() {
-    local helper_url="$1"
     if [[ "$(cat /proc/sys/kernel/yama/ptrace_scope 2>/dev/null || echo 0)" == "0" ]]; then
         log "INFO" "This system lets the service read Deadlock's memory without a helper."
-        return 0
-    fi
-    if [[ -z "$helper_url" ]]; then
-        log "WARN" "This release has no memory helper; match salts are read from Steam's cache only."
         return 0
     fi
 
@@ -355,7 +349,7 @@ install_memory_helper() {
 
     local helper_tmp
     helper_tmp=$(mktemp)
-    if ! curl -fsSL "$helper_url" -o "$helper_tmp"; then
+    if ! fetch "$RELEASE_URL/$HELPER_ASSET" "$helper_tmp"; then
         log "WARN" "Could not download the memory helper; skipping it."
         rm -f "$helper_tmp"
         return 0
@@ -417,26 +411,27 @@ prompt_for_autostart() {
 
 # --- Main Installation Logic ---
 main() {
+    # Everything goes into the home of the user running the script, and the service is that
+    # user's systemd service, so under sudo it would all be root's.
+    if [[ $EUID -eq 0 ]]; then
+        echo -e "${RED}Run the installer as your own user: run the same command again without sudo.${NC}" >&2
+        echo "It installs for the user who runs it and asks for your password itself if it needs it." >&2
+        exit 1
+    fi
+
     log "INFO" "Starting DTV Ingest installation..."
     log "INFO" "Log file is available at: $LOG_FILE"
 
     check_dependencies
 
-    local release_info
-    release_info=$(get_latest_release)
-    local version download_url size helper_url
-    IFS='|' read -r version download_url size helper_url <<< "$release_info"
-
-    if [[ -z "$version" || -z "$download_url" ]]; then
-        log "ERROR" "Failed to parse release information. Cannot continue."
-        exit 1
-    fi
+    download_file "$RELEASE_URL/$MAIN_ASSET" "$DOWNLOAD_PATH"
+    check_binary_runs "$DOWNLOAD_PATH"
 
     # Try to run uninstall script if it exists (clean uninstall before fresh install)
     local existing_uninstall_script="$INSTALL_DIR/uninstall-linux.sh"
     if [[ -f "$existing_uninstall_script" ]]; then
         log "INFO" "Found existing installation. Running uninstall script..."
-        if "$existing_uninstall_script" --silent 2>/dev/null; then
+        if "$existing_uninstall_script" --silent >> "$LOG_FILE" 2>&1; then
             log "SUCCESS" "Previous installation uninstalled successfully."
         else
             log "WARN" "Uninstall script failed, continuing with manual cleanup."
@@ -452,12 +447,8 @@ main() {
     # Ensure installation directory exists
     mkdir -p "$INSTALL_DIR"
 
-    local temp_download_path="$INSTALL_DIR/${APP_NAME}-${version}"
-    download_file "$download_url" "$temp_download_path" "$size"
-
     local final_executable_path="$INSTALL_DIR/$FINAL_EXECUTABLE_NAME"
-    mv "$temp_download_path" "$final_executable_path"
-    chmod +x "$final_executable_path"
+    mv "$DOWNLOAD_PATH" "$final_executable_path"
 
     # Create bin directory if it doesn't exist
     mkdir -p "$BIN_DIR"
@@ -471,7 +462,7 @@ main() {
     local uninstall_script_path="$INSTALL_DIR/uninstall-linux.sh"
     local uninstall_script_url="https://raw.githubusercontent.com/DTV-GG/dtv-ingest/master/uninstall-linux.sh"
 
-    if curl -fsSL "$uninstall_script_url" -o "$uninstall_script_path"; then
+    if fetch "$uninstall_script_url" "$uninstall_script_path"; then
         chmod +x "$uninstall_script_path"
         log "SUCCESS" "Uninstall script downloaded to: $uninstall_script_path"
     else
@@ -479,7 +470,7 @@ main() {
         log "INFO" "You can manually download it from: $uninstall_script_url"
     fi
 
-    install_memory_helper "$helper_url"
+    install_memory_helper
 
     # Create the main service (but don't enable/start it yet)
     manage_service "create" "$final_executable_path"
@@ -572,7 +563,7 @@ main() {
     # The app-menu entry everyone gets (search "Deadlock"): opens the status window, which
     # also starts the background service if it isn't running.
     # Neither is required for the tool to work, so failures only warn.
-    install_icon "$version" || true
+    install_icon || true
     if ! create_desktop_shortcut "$final_executable_path" "--gui" "DTV Ingest" "See the Deadlock matches you have sent to trackers" "$APP_NAME-status"; then
         log "WARN" "Could not create the app menu entry. Open the status window with: $final_executable_path --gui"
     fi

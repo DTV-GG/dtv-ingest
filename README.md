@@ -37,6 +37,14 @@ et lance-le. Pas besoin des droits administrateur. L'appli s'installe dans
 curl -fsSL https://raw.githubusercontent.com/DTV-GG/dtv-ingest/master/install-linux.sh | bash
 ```
 
+Sans curl (Ubuntu de base n'a que wget) :
+
+```bash
+wget -O- https://raw.githubusercontent.com/DTV-GG/dtv-ingest/master/install-linux.sh | bash
+```
+
+Lance la commande avec ton utilisateur, sans `sudo`.
+
 Pour lire la mémoire du jeu, l'installeur propose un petit utilitaire,
 `dtv-ingest-memgrant`, qui demande ton mot de passe une fois. Sans lui, lance plutôt le jeu
 par l'option de lancement Steam `~/.local/bin/dtv-ingest -- %command%`.
