@@ -20,6 +20,13 @@ if [[ "$1" == "--silent" ]]; then
     SILENT=true
 fi
 
+# Run as `curl … | bash`, stdin is this script itself (BASH_SOURCE is then empty), so the
+# prompts read the terminal instead.
+PROMPT_INPUT=/dev/stdin
+if [[ -z "${BASH_SOURCE[0]}" && -r /dev/tty ]]; then
+    PROMPT_INPUT=/dev/tty
+fi
+
 if [[ "$SILENT" == false ]]; then
     echo ""
     echo -e "${CYAN}========================================${NC}"
@@ -34,7 +41,7 @@ if [[ "$SILENT" == false ]]; then
     echo -e "  ${NC}- Binary symlink: $BIN_SYMLINK${NC}"
     echo ""
     
-    read -p "Continue with uninstallation? (Y/N): " -n 1 -r
+    read -p "Continue with uninstallation? (Y/N): " -n 1 -r < "$PROMPT_INPUT"
     echo ""
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
         echo -e "${YELLOW}Uninstallation cancelled.${NC}"
@@ -107,6 +114,10 @@ rm -f "$HOME/.local/share/applications/$APP_NAME.desktop"
 rm -f "$HOME/.local/share/applications/$APP_NAME-once.desktop"
 rm -f "$HOME/.local/share/applications/$APP_NAME-status.desktop"
 rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/$APP_NAME.png"
+# The installer's log; a reinstall (--silent) is writing to it right now.
+if [[ "$SILENT" == false ]]; then
+    rm -rf "${XDG_CACHE_HOME:-$HOME/.cache}/$APP_NAME"
+fi
 
 # The memory helper is root-owned. A reinstall (--silent) keeps it.
 HELPER_DIR="/usr/local/libexec/$APP_NAME"
@@ -134,5 +145,5 @@ echo ""
 
 if [[ "$SILENT" == false ]]; then
     echo "Press Enter to exit..."
-    read -r
+    read -r < "$PROMPT_INPUT"
 fi

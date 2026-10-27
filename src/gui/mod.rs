@@ -129,14 +129,15 @@ impl App {
     fn boot() -> (Self, Task<Message>) {
         let mut app = Self {
             theme: Theme::custom(
-                "Deadlock",
+                "DTV",
+                // dtv.gg's palette: dark ground, cream text, orange actions.
                 Palette {
-                    background: color!(0x15171c),
-                    text: color!(0xe9e6df),
-                    primary: color!(0xd6a24e),
-                    success: color!(0x5cb87a),
+                    background: color!(0x151413),
+                    text: color!(0xf7e9d5),
+                    primary: color!(0xdd6638),
+                    success: color!(0x97da79),
                     warning: color!(0xe3a33b),
-                    danger: color!(0xe0605a),
+                    danger: color!(0xf06a5e),
                 },
             ),
             tracker: Arc::default(),

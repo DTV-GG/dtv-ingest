@@ -91,7 +91,7 @@ mod platform {
         let exe = exe.display().to_string();
         key.set_value("DisplayName", &DISPLAY_NAME)?;
         key.set_value("DisplayVersion", &env!("CARGO_PKG_VERSION"))?;
-        key.set_value("Publisher", &"Deadlock API")?;
+        key.set_value("Publisher", &"DTV")?;
         key.set_value("DisplayIcon", &exe)?;
         key.set_value("UninstallString", &format!("\"{exe}\" --uninstall"))?;
         key.set_value(
